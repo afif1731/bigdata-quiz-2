@@ -1,0 +1,5 @@
+quart
+quart-cors
+pyspark
+asyncio
+numpy
