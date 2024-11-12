@@ -4,7 +4,8 @@ from quart import Quart, request, jsonify
 from quart_cors import cors
 from middleware.custom_error import CustomError
 from middleware.custom_response import CustomResponse
-
+import asyncio
+import json
 import os
 
 PORT=4000
@@ -27,7 +28,7 @@ model3 = load_model("model3")
 async def shutdown():
     await spark.close()
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def home():
     return 'runnin wild...'
 
@@ -42,30 +43,35 @@ async def RecommendationRouter():
 
         if modelName is None:
             raise CustomError(400, 'model query required')
-        
-        if modelName != 'model1' or modelName != 'model2' or modelName != 'model3':
+
+        if modelName not in ['model1', 'model2', 'model3']:
             raise CustomError(400, 'invalid model name')
-        
+
+        user_id_df = spark.createDataFrame([(req['user_id'],)], ["user_id"])
         if modelName == 'model1':
-            recommendations = await model1.recommendForUserSubset(req['user_id'], 5)  # Misalnya, rekomendasi 5 produk
-            response = CustomResponse(200, 'get recommendation successfully', recommendations)
+            recommendations = model1.recommendForUserSubset(user_id_df, 5)  # Misalnya, rekomendasi 5 produk
+            recommendations_json = recommendations.toPandas().to_json(orient='records')
+            response = CustomResponse(200, 'get recommendation successfully', recommendations_json)
             return jsonify(response.JSON()), response.code
-        
+
         elif modelName == 'model2':
-            recommendations = await model2.recommendForUserSubset(req['user_id'], 5)  # Misalnya, rekomendasi 5 produk
-            response = CustomResponse(200, 'get recommendation successfully', recommendations)
+            recommendations = model2.recommendForUserSubset(user_id_df, 5)  # Misalnya, rekomendasi 5 produk
+            recommendations_json = recommendations.toPandas().to_json(orient='records')
+            response = CustomResponse(200, 'get recommendation successfully', recommendations_json)
             return jsonify(response.JSON()), response.code
-        
+
         elif modelName == 'model3':
-            recommendations = await model3.recommendForUserSubset(req['user_id'], 5)  # Misalnya, rekomendasi 5 produk
-            response = CustomResponse(200, 'get recommendation successfully', recommendations)
+            recommendations = model3.recommendForUserSubset(user_id_df, 5)  # Misalnya, rekomendasi 5 produk
+            recommendations_json = recommendations.toPandas().to_json(orient='records')
+            response = CustomResponse(200, 'get recommendation successfully', recommendations_json)
             return jsonify(response.JSON()), response.code
-        
+
         else:
             raise CustomError(400, 'invalid model name')
     except Exception as err:
-        return jsonify(err.JSON()),err.code
+        print(err)
+        return jsonify({"error": json.dumps(err)}),500
 
 
 if __name__ == '__main__':
-    app.run(port=PORT)
+    asyncio.run(app.run(host='159.89.203.127', port=PORT, debug=True))
